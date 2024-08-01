@@ -61,17 +61,6 @@ def api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, rfo
     return base_url
 
 
-
-
-# OpenAPI 별 지정 값
-# - service_key : API 서비스 키
-# - query_params : API 호출 시 필요한 파라미터 정보
-# - table_name : 테이블 명 
-# - columns_str : 테이블 컬럼명 (지정하는 이유: API 호출 시 키 값으로 가져올 수도 있었으나, 특정 몇몇 API의 키 값이 한국어로 되어 있어 영문으로 직접 지정하여 구현하였음.)
-# - body : API 호출 시 필요한 body 정보 (API마다 가져오려는 상위 키 값의 이름이 다름)
-# - subparsers : 요청하려는 API에 대해 상세 조회를 수행할 때 필요한 파라미터를 받기 위한 설정을 구성
-
-
 # 수질 데이터
 def water_quality(api_name, num_of_rows, page_no, result_type, wmyr_list):
     query_params = {
@@ -80,7 +69,6 @@ def water_quality(api_name, num_of_rows, page_no, result_type, wmyr_list):
         'resultType': result_type,
         'wmyrList': wmyr_list
     }
-    
     base_url = api_url_query_params(api_name)
     url_parts = list(urllib.parse.urlparse(base_url))
     query = urllib.parse.parse_qs(url_parts[4])
@@ -110,7 +98,6 @@ def water_level(api_name, hydro_type, data_type, time_type, wlobscd, document_ty
 def rainfall(api_name, hydro_type, data_type, time_type, rfobscd, document_type):
     rfobscd = 10184100
     final_url = api_url_path_params(api_name, hydro_type, data_type, time_type, "", rfobscd, document_type)
-    print("final_url : " , final_url)
     json_ob = get_data_load(final_url)
     table_name  = 'TB_RAINFALL'
     columns_str = '''rfobscd, ymdhm, rf'''
@@ -136,9 +123,6 @@ def water_level_rainfall_sub(api_name, hydro_type):
     response_data(body , table_name, columns_str)
     
     
-     
-    
-    
 def get_parser():
     parser = argparse.ArgumentParser(description='API별 크롤링 및 파라미터 처리')
     subparsers = parser.add_subparsers(dest='api', help='API 이름을 지정하세요.')
@@ -154,7 +138,7 @@ def get_parser():
     # 수위, 강수량에 대한 서브 파서
     # python main.py water_level_rainfall --apiName=waterlevel
     water_level_rainfall_api = subparsers.add_parser('water_level_rainfall', help='water_level_rainfall')
-    water_level_rainfall_api.add_argument('--apiName', default="", help="waterlevel or rainfall") # api 이름 선택 
+    water_level_rainfall_api.add_argument('--apiName', default="", help="waterlevel or rainfall") # api 이름 선택
     water_level_rainfall_api.add_argument('--dataType', default="list") # 단위 waterlevel or rainfall
     water_level_rainfall_api.add_argument('--timeType', default="10M", help="10M , 1H, 1D") #단위
     water_level_rainfall_api.add_argument('--wlobscd', default="3011665", help="관측소 코드") # 관측소 코드
@@ -170,6 +154,7 @@ def get_parser():
     return parser
 
 if __name__ == '__main__':
+    
     config = configparser.RawConfigParser(interpolation=None)
     config.read("config.ini", encoding="utf-8")
             
@@ -177,14 +162,22 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.api == 'water_quality':
+        
         water_quality(args.api, args.numOfRows, args.pageNo, args.resultType, args.wmyrList)
+    
     elif args.api == 'water_level_rainfall': # 수위, 강수량 
+        
         if args.apiName == "waterlevel":
+            
             print("args.api :" , args.api)
             water_level(args.api, args.apiName, args.dataType, args.timeType, args.wlobscd, args.rType)
+            
         elif args.apiName == "rainfall":
+            
             rainfall(args.api, args.apiName, args.dataType, args.timeType, args.wlobscd, args.rType)
+    
     elif args.api == "water_level_rainfall_sub": # 수위 강수량 관측소 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
+        
         water_level_rainfall_sub(args.api, args.apiName)
 
         # water_level(args.api, args.numOfRows, args.pageNo, args.resultType, args.wmyrList)
