@@ -1,0 +1,10 @@
+
+/**  수질 조회 API명령어  **/
+python main.py water_quality
+
+
+/**  수위, 강수량 실시간 조회 API명령어  **/
+python main.py  water_level_rainfall --apiName=(waterlevel or rainfall)
+
+/**  수위 및 강수량 관측소 정보 조회 API명령어  **/
+python main.py water_level_rainfall_sub --apiName=(waterlevel or rainfall)

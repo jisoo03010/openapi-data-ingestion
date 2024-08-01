@@ -30,15 +30,18 @@ def save_to_database(table_name, columns_str, data_frame):
     # v
     try:
         data_frame = data_frame.where(pd.notnull(data_frame), '')
-
         columns = data_frame.columns.tolist()
-        if 'ROWNO' in columns:
+        if table_name == 'TB_WATER_QUALITY':
             columns.remove('ROWNO')
+        elif table_name == 'TB_WATER_LEVEL' or table_name == 'TB_WATER_LEVEL_OBSERVATION_POINT' \
+              or table_name == 'TB_RAINFALL' or table_name == 'TB_RAINFALL_OBSERVATION_POINT':
+            columns.remove('links')
+            
         for _, row in data_frame.iterrows():
             values = tuple(None if isinstance(row[col], float) and math.isnan(row[col]) else row[col] for col in columns)
-            values += (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            
+            # values += (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES {values}"
+            
             print("\n\n\n\n\nQuery ------------------------------\n", insert_query)
             cursor.execute(insert_query)
         conn.commit()

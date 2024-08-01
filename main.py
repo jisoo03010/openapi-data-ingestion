@@ -1,13 +1,11 @@
 
 import argparse
 import configparser
-import re
 import json
 import requests
 import urllib.parse
 import configparser
-import subprocess
-
+import datetime
 import pandas as pd
 from database_connect import save_to_database
 from water_quality import response_data
@@ -27,14 +25,40 @@ def response_data(body , table_name, columns_str):
     data_frame = pd.json_normalize(body)
     save_to_database(table_name, columns_str,  data_frame)
     
-def api_url(api_name):
+def api_url_query_params(api_name):
     api_name = api_name.upper()
     service_key = config.get(api_name, 'service_key')
     api_url = config.get(api_name, 'api_url')
     base_url = api_url.format(key=service_key)
     return base_url
 
-
+def api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, rfobscd, document_type):
+    api_name = api_name.upper()
+    if hydro_type == 'rainfall':
+        service_key = config.get(api_name, 'rainfall_service_key')
+        print("service_key L: ", service_key)
+        api_url = config.get(api_name, 'api_url')
+        base_url = api_url.format(
+                                apiName=hydro_type,
+                                key=service_key,
+                                dataType=data_type,
+                                timeType=time_type,
+                                scd=rfobscd,
+                                rType=document_type
+                                )
+    else:
+        service_key = config.get(api_name, 'service_key')
+        print("service_key L: ", service_key)
+        api_url = config.get(api_name, 'api_url')
+        base_url = api_url.format(
+                                apiName=hydro_type,
+                                key=service_key,
+                                dataType=data_type,
+                                timeType=time_type,
+                                scd=wlobscd,
+                                rType=document_type
+                                )
+    return base_url
 
 
 
@@ -57,7 +81,7 @@ def water_quality(api_name, num_of_rows, page_no, result_type, wmyr_list):
         'wmyrList': wmyr_list
     }
     
-    base_url = api_url(api_name)
+    base_url = api_url_query_params(api_name)
     url_parts = list(urllib.parse.urlparse(base_url))
     query = urllib.parse.parse_qs(url_parts[4])
     query.update(query_params)
@@ -66,34 +90,53 @@ def water_quality(api_name, num_of_rows, page_no, result_type, wmyr_list):
     
     json_ob = get_data_load(final_url)
     table_name  = 'TB_WATER_QUALITY'
-    columns_str = '''ptNo, ptNm, addr, orgNm, wmyr, wmod, wmwk, lonDgr, lonMin, lonSec, latDgr, latMin, latSec, wmcymd, wmdep, itemLvl, itemAmnt, itemTemp, itemPh, itemDoc, itemBod, itemCod, itemSs, itemTcoli, itemTn, itemTp, itemCd, itemCn, itemPb, itemCr6, itemAs, itemHg, itemCu, itemAbs, itemPcb, itemOp, itemMn, itemTrans, itemCloa, itemCl, itemZn, itemCr, itemFe, itemPhenol, itemNhex, itemEc, itemTce, itemPce, itemNo3n, itemNh3n, itemEcoli, itemPop, itemDtn, itemDtp, itemFl, itemCol, itemAlgol, itemCcl4, itemDceth, itemDcm,  itemBenzene, itemChcl3, itemToc, itemDehp, itemAntimon, itemDiox, itemHcho, itemHcb, itemNi, itemBa, itemSe, createdAt, updatedAt '''
+    columns_str = '''ptNo, ptNm, addr, orgNm, wmyr, wmod, wmwk, lonDgr, lonMin, lonSec, latDgr, latMin, latSec, wmcymd, wmdep, itemLvl, itemAmnt, itemTemp, itemPh, itemDoc, itemBod, itemCod, itemSs, itemTcoli, itemTn, itemTp, itemCd, itemCn, itemPb, itemCr6, itemAs, itemHg, itemCu, itemAbs, itemPcb, itemOp, itemMn, itemTrans, itemCloa, itemCl, itemZn, itemCr, itemFe, itemPhenol, itemNhex, itemEc, itemTce, itemPce, itemNo3n, itemNh3n, itemEcoli, itemPop, itemDtn, itemDtp, itemFl, itemCol, itemAlgol, itemCcl4, itemDceth, itemDcm,  itemBenzene, itemChcl3, itemToc, itemDehp, itemAntimon, itemDiox, itemHcho, itemHcb, itemNi, itemBa, itemSe''' #, createdAt, updatedAt 
     body = json_ob['getWaterMeasuringList']['item']
     response_data(body , table_name, columns_str)
     
 
-def water_level(api_name, hydro_type, data_type, time_type, wlobscd, sdt, edt, document_type):
-    query_params ={
-        "HydroType": hydro_type,
-        "DataType": data_type,
-        "TimeType": time_type,
-        "Wlobscd":wlobscd,
-        "Sdt": sdt,
-        "Edt": edt,
-        "DocumentType" : document_type
-    }
-    base_url = api_url(api_name)
-    
-    url_parts = list(urllib.parse.urlparse(base_url))
-    query = urllib.parse.parse_qs(url_parts[4])
-    query.update(query_params)
-    url_parts[4] = urllib.parse.urlencode(query, doseq=True)
-    final_url = urllib.parse.urlunparse(url_parts)
-    
+# 수위 
+def water_level(api_name, hydro_type, data_type, time_type, wlobscd, document_type):
+    # water_level_rainfall, waterlevel, list, 10M, 10M, json
+    final_url = api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, "", document_type)
     json_ob = get_data_load(final_url)
     table_name  = 'TB_WATER_LEVEL'
-    columns_str = '''wlobscd, ymdhm, wl, fw, links'''
-    body = json_ob['getWaterMeasuringList']['item']
+    columns_str = '''wlobscd, ymdhm, wl, fw'''
+    body = json_ob['content']
     response_data(body , table_name, columns_str)
+
+
+# 강수량 rainfall(args.api, args.apiName, args.dataType, args.timeType, args.wlobscd, args.rType)
+def rainfall(api_name, hydro_type, data_type, time_type, rfobscd, document_type):
+    rfobscd = 10184100
+    final_url = api_url_path_params(api_name, hydro_type, data_type, time_type, "", rfobscd, document_type)
+    print("final_url : " , final_url)
+    json_ob = get_data_load(final_url)
+    table_name  = 'TB_RAINFALL'
+    columns_str = '''rfobscd, ymdhm, rf'''
+    body = json_ob['content']
+    response_data(body , table_name, columns_str)
+    
+    
+    
+# 수위, 강수량 관측소 정보 조회 
+def water_level_rainfall_sub(api_name, hydro_type):
+    print("api_name ; ", api_name)
+    final_url = api_url_path_params(api_name, hydro_type , "", "",  "", "", "")
+    json_ob = get_data_load(final_url)
+    
+    if hydro_type == 'waterLevel':
+        table_name  = 'TB_WATER_LEVEL_OBSERVATION_POINT' # 수위 관측소 정보 테이블
+        columns_str = '''wlobscd, agcnm, obsnm, addr, etcaddr, lon, lat, gdt, attwl, wrnwl, almwl, srswl, pfh, fstnyn'''
+    else:
+        table_name  = 'TB_RAINFALL_OBSERVATION_POINT' # 강수량 관측소 정보 테이블
+        columns_str = '''rfobscd, obsnm, agcnm, addr, etcaddr, lon, lat'''
+        
+    body = json_ob['content']
+    response_data(body , table_name, columns_str)
+    
+    
+     
     
     
 def get_parser():
@@ -108,16 +151,22 @@ def get_parser():
     water_quality_api.add_argument('--wmyrList', default="2024", help="Year list for water measurements.")
     
     
-    # water_level_api에 대한 서브 파서
-    water_level_api = subparsers.add_parser('water_level', help='water_level_api')
-    water_level_api.add_argument('--HydroType', default="", help="")
-    water_level_api.add_argument('--DataType', default="", help="")
-    water_level_api.add_argument('--TimeType', default="", help="")
-    water_level_api.add_argument('--Wlobscd', default="", help="")
-    water_level_api.add_argument('--Sdt', default="", help="")
-    water_level_api.add_argument('--Edt', default="", help="")
-    water_level_api.add_argument('--DocumentType', default="json", help="")
+    # 수위, 강수량에 대한 서브 파서
+    # python main.py water_level_rainfall --apiName=waterlevel
+    water_level_rainfall_api = subparsers.add_parser('water_level_rainfall', help='water_level_rainfall')
+    water_level_rainfall_api.add_argument('--apiName', default="", help="waterlevel or rainfall") # api 이름 선택 
+    water_level_rainfall_api.add_argument('--dataType', default="list") # 단위 waterlevel or rainfall
+    water_level_rainfall_api.add_argument('--timeType', default="10M", help="10M , 1H, 1D") #단위
+    water_level_rainfall_api.add_argument('--wlobscd', default="3011665", help="관측소 코드") # 관측소 코드
+    water_level_rainfall_api.add_argument('--sdt', default="", help="yyyyMMddHHmm, yyyyMMddHH, yyyyMMdd") # 시작시간
+    water_level_rainfall_api.add_argument('--edt', default="", help="yyyyMMddHHmm, yyyyMMddHH, yyyyMMdd") # 종료 시간
+    water_level_rainfall_api.add_argument('--rType', default="json", help="Format of the result (json or xml).") # return 타입
     
+    
+    # 수위, 강수량 관측소 정보 파서
+    water_level_rainfall_sub_api = subparsers.add_parser('water_level_rainfall_sub', help='water_level_rainfall_sub')
+    water_level_rainfall_sub_api.add_argument('--apiName', help="waterlevel or rainfall.") # return 타입
+     
     return parser
 
 if __name__ == '__main__':
@@ -127,18 +176,17 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
 
-    # pageName = args.pageName.upper()
     if args.api == 'water_quality':
-        print("args.api : " , args.api )
-        print("args.numOfRows : " , args.numOfRows )
-        print("args.pageNo : " , args.pageNo )
-        print("args.resultType :" ,args.resultType )
-        print("args.wmyrList : " , args.wmyrList )
         water_quality(args.api, args.numOfRows, args.pageNo, args.resultType, args.wmyrList)
-    elif args.api == 'water_level':
-        print("water_level start")
-        
-    
+    elif args.api == 'water_level_rainfall': # 수위, 강수량 
+        if args.apiName == "waterlevel":
+            print("args.api :" , args.api)
+            water_level(args.api, args.apiName, args.dataType, args.timeType, args.wlobscd, args.rType)
+        elif args.apiName == "rainfall":
+            rainfall(args.api, args.apiName, args.dataType, args.timeType, args.wlobscd, args.rType)
+    elif args.api == "water_level_rainfall_sub": # 수위 강수량 관측소 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
+        water_level_rainfall_sub(args.api, args.apiName)
+
         # water_level(args.api, args.numOfRows, args.pageNo, args.resultType, args.wmyrList)
         
     # 페이지 모듈 별 정보 
