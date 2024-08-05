@@ -17,7 +17,6 @@ from water_quality import response_data
 def get_data_load(url):
     response = requests.get(url, verify=False)
     contents = response.text
-    print("contents :", contents)
     json_ob = json.loads(contents)
     return json_ob
     
@@ -29,10 +28,13 @@ def response_data(body , table_name, columns_str):
     
 def api_url_query_params(api_name):
     api_name = api_name.upper()
-    service_key = config.get(api_name, 'service_key')
     api_url = config.get(api_name, 'api_url')
-    base_url = api_url.format(key=service_key)
-    return base_url
+    if config.get(api_name, 'service_key') == "":
+        return api_url
+    else :
+        service_key = config.get(api_name, 'service_key')
+        base_url = api_url.format(key=service_key)
+        return base_url
 
 def api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, rfobscd, document_type):
     api_name = api_name.upper()
@@ -202,6 +204,52 @@ def atmoshpere_sub(api_name, num_of_rows, page_no, station_name, addr, return_ty
     body = json_ob['response']['body']['items']
     response_data(body , table_name, columns_str)
     
+    
+        
+def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit):
+    query_params = {
+        'api': api_name,
+        'ccbaCtcd': ccba_ctcd,  
+        'ccbaKdcd': ccba_kdcd,  
+        'pageUnit': page_unit
+    }
+    base_url = api_url_query_params(api_name)
+    url_parts = list(urllib.parse.urlparse(base_url))
+    query = urllib.parse.parse_qs(url_parts[4])
+    query.update(query_params)
+    
+    url_parts[4] = urllib.parse.urlencode(query, doseq=True)
+    final_url = urllib.parse.urlunparse(url_parts)
+    
+    print("final_url:", final_url)
+    json_ob = get_data_load(final_url)
+    table_name  = 'TB_CULTURAL'
+    columns_str = ''' no, ccmaName, ccbaMnm1, ccbaMnm2, ccbaCtcdNm, ccsiName, ccbaAdmin, ccbaKdcd, ccbaCtcd, ccbaAsno, ccbaCncl, ccbaCpno, longitude, latitude, regDt''' #, createdAt, updatedAt 
+    body = json_ob['result']
+    response_data(body , table_name, columns_str)
+    
+def tourism(api_name, page_unit, search_cnd, search_krwd):
+    query_params = {
+        'api': api_name,
+        'pageUnit': page_unit,  
+        'searchCnd': search_cnd,
+        'searchKrwd': search_krwd
+    }
+    base_url = api_url_query_params(api_name)
+    url_parts = list(urllib.parse.urlparse(base_url))
+    query = urllib.parse.parse_qs(url_parts[4])
+    query.update(query_params)
+    
+    url_parts[4] = urllib.parse.urlencode(query, doseq=True)
+    final_url = urllib.parse.urlunparse(url_parts)
+    
+    json_ob = get_data_load(final_url)
+    table_name  = 'TB_TOURISM'
+    columns_str = '''zip, areaSe, lng, thumbImg, regDate, tourImg, hmpg, telno, tourSe, tourNm, mobileTelno, tourUrl, adres, tourNo, lat, operTime, intrcn''' #, createdAt, updatedAt 
+    body = json_ob['result']
+    response_data(body , table_name, columns_str)
+    
+
 def get_parser():
     parser = argparse.ArgumentParser(description='API별 크롤링 및 파라미터 처리')
     subparsers = parser.add_subparsers(dest='api', help='API 이름을 지정하세요.')
@@ -263,7 +311,7 @@ def get_parser():
     # 문화재 정보 파서
     cultural_api = subparsers.add_parser('cultural', help='cultural')
     cultural_api.add_argument('--ccbaCtcd', default="33",  help="")
-    cultural_api.add_argument('--ccbaCncl', default="N",  help="")
+    cultural_api.add_argument('--ccbaKdcd', default="11",  help="")
     cultural_api.add_argument('--pageUnit', default="300",  help="")
     
     # 문화재 이미지 정보 파서
@@ -283,10 +331,9 @@ def get_parser():
     
     # 관광지 정보 파서
     tourism_api = subparsers.add_parser('tourism', help='tourism')
-    tourism_api.add_argument('--pageUnit', default="100",  help="") # totalCount
-    tourism_api.add_argument('--pageIndex ', default="1",  help="")
+    tourism_api.add_argument('--pageUnit', default="2000",  help="") # totalCount
     tourism_api.add_argument('--searchCnd', default="tourNm",  help="")
-    tourism_api.add_argument('--searchKrwd', default="청주",  help="")
+    tourism_api.add_argument('--searchKrwd', default="",  help="") # 청주 (필수x)
     
     return parser
 
@@ -318,24 +365,24 @@ if __name__ == '__main__':
     elif args.api == "weather": # 수위 강수량 관측소 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
         weather(args.api, args.pageNo,  args.numOfRows, args.dataType, args.base_date, args.base_time, args.nx, args.ny)
         
-    elif args.api == "atmoshpere": # 대기 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
+    elif args.api == "atmoshpere": # 대기 정보
         atmoshpere(args.api, args.sidoName, args.numOfRows, args.pageNo, args.ver, args.returnType)
         
-    elif args.api == "atmoshpere_sub": # 대기 관측소 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
+    elif args.api == "atmoshpere_sub": # 대기 관측소 정보
         atmoshpere_sub(args.api, args.numOfRows,  args.pageNo, args.stationName, args.addr, args.returnTypeSub)
         
-    # elif args.api == "cultural": # 문화재 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
-    #     cultural(args.api, )
+    elif args.api == "cultural": # 문화재 정보 (xml 변환 필요)
+        cultural(args.api, args.ccbaCtcd, args.ccbaKdcd, args.pageUnit)
         
-    # elif args.api == "cultural_img": # 문화재 이미지 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
+    # elif args.api == "cultural_img": # 문화재 이미지 정보  (xml 변환 필요)
     #     cultural_img(args.api, )
         
-    # elif args.api == "tourism": # 관광지 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
-    #     tourism(args.api, )
+    elif args.api == "tourism": # 관광지 정보
+        tourism(args.api, args.pageUnit, args.searchCnd, args.searchKrwd )
         
     # if config.has_section(pageName):
         
-        # 서비스 키, api_url 가져오기 
+        # 서비스 키, api_url 가져오기
         # service_key = config.get(pageName, 'service_key')
         # api_url = config.get(pageName, 'api_url')
         # url = f"{api_url}?serviceKey={service_key}"
