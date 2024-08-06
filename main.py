@@ -11,7 +11,48 @@ from database_connect import save_to_database
 from water_quality import response_data
 # 각 페이지에 필요한 파라미터 정보
 
+def merge_data_frames(data_frames):
+    # 데이터 프레임들을 수직 결합
+    merged_df = pd.concat(data_frames, ignore_index=True, sort=False)
 
+    if '사업장 소재지' in merged_df.columns.tolist():
+        merged_df['사업장소재지'] = merged_df['사업장소재지'].combine_first(merged_df['사업장 소재지'])
+        merged_df = merged_df.drop(columns=['사업장 소재지'])
+    
+    # '등록축종' 컬럼이 존재하는지 확인하고 결합
+    if '등록축종' in merged_df.columns.tolist():
+        merged_df['축종'] = merged_df['축종'].combine_first(merged_df['등록축종'])
+        merged_df = merged_df.drop(columns=['등록축종'])
+    
+    # '데이터기준일자' 컬럼이 존재하는지 확인하고 결합
+    if '데이터기준일자' in merged_df.columns.tolist():
+        merged_df['데이터 기준일자'] = merged_df['데이터 기준일자'].combine_first(merged_df['데이터기준일자'])
+        merged_df = merged_df.drop(columns=['데이터기준일자'])
+    
+    # '데이터기준' 컬럼이 존재하는지 확인하고 결합
+    if '데이터기준' in merged_df.columns.tolist():
+        merged_df['데이터 기준일자'] = merged_df['데이터 기준일자'].combine_first(merged_df['데이터기준'])
+        merged_df = merged_df.drop(columns=['데이터기준'])
+        
+    # '데이터기준' 컬럼이 존재하는지 확인하고 결합
+    if '면적' in merged_df.columns.tolist():
+        merged_df['사육면적'] = merged_df['사육면적'].combine_first(merged_df['면적'])
+        merged_df = merged_df.drop(columns=['면적'])
+        
+    # '데이터기준' 컬럼이 존재하는지 확인하고 결합
+    if '주사육업종' in merged_df.columns.tolist():
+        merged_df['축종'] = merged_df['축종'].combine_first(merged_df['주사육업종'])
+        merged_df = merged_df.drop(columns=['주사육업종'])
+        
+    if '연번' in merged_df.columns.tolist():
+        merged_df = merged_df.drop(columns=['연번'])
+        
+
+    # data_frame_arr.append(data_frame)
+    # merged_df = merge_data_frames(data_frame_arr)
+    print("\n\n===========\nmerged_df : ", merged_df)
+
+    return merged_df
 
 # url 통해 데이터 가져옴
 def get_data_load(url):
@@ -20,14 +61,19 @@ def get_data_load(url):
     json_ob = json.loads(contents)
     return json_ob
     
+data_frame_arr = []
 
-def response_data(body , table_name, columns_str):
+def response_data(body, table_name, columns_str):
+    global data_frame_arr
     data_frame = pd.json_normalize(body)
+    data_frame_arr.append(data_frame)
+    merged_df = merge_data_frames(data_frame_arr)
     
-    save_to_database(table_name, columns_str,  data_frame)
+    save_to_database(table_name, columns_str,  merged_df)
     
 def api_url_query_params(api_name):
     api_name = api_name.upper()
+    
     api_url = config.get(api_name, 'api_url')
     if config.get(api_name, 'service_key') == "":
         return api_url
@@ -35,6 +81,7 @@ def api_url_query_params(api_name):
         service_key = config.get(api_name, 'service_key')
         base_url = api_url.format(key=service_key)
         return base_url
+    
 
 def api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, rfobscd, document_type):
     api_name = api_name.upper()
@@ -81,7 +128,7 @@ def water_quality(api_name, num_of_rows, page_no, result_type, wmyr_list):
     final_url = urllib.parse.urlunparse(url_parts)
     
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_WATER_QUALITY'
+    table_name  = 'tb_gt_water_quality'
     columns_str = '''ptNo, ptNm, addr, orgNm, wmyr, wmod, wmwk, lonDgr, lonMin, lonSec, latDgr, latMin, latSec, wmcymd, wmdep, itemLvl, itemAmnt, itemTemp, itemPh, itemDoc, itemBod, itemCod, itemSs, itemTcoli, itemTn, itemTp, itemCd, itemCn, itemPb, itemCr6, itemAs, itemHg, itemCu, itemAbs, itemPcb, itemOp, itemMn, itemTrans, itemCloa, itemCl, itemZn, itemCr, itemFe, itemPhenol, itemNhex, itemEc, itemTce, itemPce, itemNo3n, itemNh3n, itemEcoli, itemPop, itemDtn, itemDtp, itemFl, itemCol, itemAlgol, itemCcl4, itemDceth, itemDcm,  itemBenzene, itemChcl3, itemToc, itemDehp, itemAntimon, itemDiox, itemHcho, itemHcb, itemNi, itemBa, itemSe''' #, createdAt, updatedAt 
     body = json_ob['getWaterMeasuringList']['item']
     response_data(body , table_name, columns_str)
@@ -92,7 +139,7 @@ def water_level(api_name, hydro_type, data_type, time_type, wlobscd, document_ty
     # water_level_rainfall, waterlevel, list, 10M, 10M, json
     final_url = api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, "", document_type)
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_WATER_LEVEL'
+    table_name  = 'tb_gt_water_level'
     columns_str = '''wlobscd, ymdhm, wl, fw'''
     body = json_ob['content']
     response_data(body , table_name, columns_str)
@@ -103,7 +150,7 @@ def rainfall(api_name, hydro_type, data_type, time_type, rfobscd, document_type)
     rfobscd = 10184100
     final_url = api_url_path_params(api_name, hydro_type, data_type, time_type, "", rfobscd, document_type)
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_RAINFALL'
+    table_name  = 'tb_gt_rainfall'
     columns_str = '''rfobscd, ymdhm, rf'''
     body = json_ob['content']
     response_data(body , table_name, columns_str)
@@ -117,10 +164,10 @@ def water_level_rainfall_sub(api_name, hydro_type):
     json_ob = get_data_load(final_url)
     
     if hydro_type == 'waterLevel':
-        table_name  = 'TB_WATER_LEVEL_OBSERVATION_POINT' # 수위 관측소 정보 테이블
+        table_name  = 'tb_gt_water_level_observation_point' # 수위 관측소 정보 테이블
         columns_str = '''wlobscd, agcnm, obsnm, addr, etcaddr, lon, lat, gdt, attwl, wrnwl, almwl, srswl, pfh, fstnyn'''
     else:
-        table_name  = 'TB_RAINFALL_OBSERVATION_POINT' # 강수량 관측소 정보 테이블
+        table_name  = 'tb_gt_rainfall_observation_point' # 강수량 관측소 정보 테이블
         columns_str = '''rfobscd, obsnm, agcnm, addr, etcaddr, lon, lat'''
         
     body = json_ob['content']
@@ -149,7 +196,7 @@ def weather(api_name, page_no, num_of_rows, data_type, base_date, base_time, nx,
 
     
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_WEATHER'
+    table_name  = 'tb_gt_weather'
     columns_str = '''baseDate, baseTime, category, fcstDate, fcstTime, fcstValue, nx, ny ''' #, createdAt, updatedAt 
     body = json_ob['response']['body']['items']['item']
     response_data(body , table_name, columns_str)
@@ -175,7 +222,7 @@ def atmoshpere(api_name, sido_name, num_of_rows, page_no, ver, return_type):
     print("final_url : ", final_url)
     json_ob = get_data_load(final_url)
     print("json_ob : ", json_ob)
-    table_name  = 'TB_ATMOSPHERE'
+    table_name  = 'tb_gt_atmosphere'
     columns_str = '''so2Grade, coFlag, khaiValue, so2Value, coValue, pm25Flag, pm10Flag, pm10Value, o3Grade, khaiGrade, pm25Value, sidoName, no2Flag, no2Grade, o3Flag, pm25Grade, so2Flag, dataTime, coGrade, no2Value, stationName, pm10Grade, o3Value''' #, createdAt, updatedAt 
     body = json_ob['response']['body']['items']
     response_data(body , table_name, columns_str)
@@ -199,7 +246,7 @@ def atmoshpere_sub(api_name, num_of_rows, page_no, station_name, addr, return_ty
     final_url = urllib.parse.urlunparse(url_parts)
     
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_ATMOSPHERE_OBSERVATION_POINT'
+    table_name  = 'tb_gt_atmosphere_observation_point'
     columns_str = '''dmX, item,  mangName,  year, addr, stationName, dmY''' #, createdAt, updatedAt 
     body = json_ob['response']['body']['items']
     response_data(body , table_name, columns_str)
@@ -223,7 +270,7 @@ def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit):
     
     print("final_url:", final_url)
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_CULTURAL'
+    table_name  = 'tb_gt_cultural'
     columns_str = ''' no, ccmaName, ccbaMnm1, ccbaMnm2, ccbaCtcdNm, ccsiName, ccbaAdmin, ccbaKdcd, ccbaCtcd, ccbaAsno, ccbaCncl, ccbaCpno, longitude, latitude, regDt''' #, createdAt, updatedAt 
     body = json_ob['result']
     response_data(body , table_name, columns_str)
@@ -244,10 +291,41 @@ def tourism(api_name, page_unit, search_cnd, search_krwd):
     final_url = urllib.parse.urlunparse(url_parts)
     
     json_ob = get_data_load(final_url)
-    table_name  = 'TB_TOURISM'
+    table_name  = 'tb_gt_tourism'
     columns_str = '''zip, areaSe, lng, thumbImg, regDate, tourImg, hmpg, telno, tourSe, tourNm, mobileTelno, tourUrl, adres, tourNo, lat, operTime, intrcn''' #, createdAt, updatedAt 
     body = json_ob['result']
     response_data(body , table_name, columns_str)
+
+def farminfo(api_name, page, per_page, return_type):
+    print("api_name : ", api_name)
+    query_params = {
+        'api': api_name,
+        'page': page,  
+        'perPage': per_page,
+        'returnType': return_type
+    }
+    
+    api_name = api_name.upper()
+    service_key = config.get(api_name, 'service_key')
+    arr = ['jincheon', 'jeungpyeong', 'eumseong', 'goesan', 'cheongju']
+    table_name  = 'tb_gt_farminfo'
+    columns_str = '''farmName, BusinessAddress, farmArea, livestockType, dataReferenceDate, numberOfLivestock, animalCount, roadAddress, lotAddress, category''' #, createdAt, updatedAt 
+    
+    for i in arr:
+        i += '_api_url'
+        api_url = config.get(api_name, i)
+        base_url = api_url.format(key=service_key)
+    
+        url_parts = list(urllib.parse.urlparse(base_url))
+        query = urllib.parse.parse_qs(url_parts[4])
+        query.update(query_params)
+    
+        url_parts[4] = urllib.parse.urlencode(query, doseq=True)
+        final_url = urllib.parse.urlunparse(url_parts)
+    
+        json_ob = get_data_load(final_url)
+        body = json_ob['data']
+        response_data(body , table_name, columns_str)
     
 
 def get_parser():
@@ -308,24 +386,24 @@ def get_parser():
     atmoshpere_sub_api.add_argument('--stationName', default="",  help="")
     
     
-    # 문화재 정보 파서
+    # 문화재 정보 파서 (xml 전처리 필요)
     cultural_api = subparsers.add_parser('cultural', help='cultural')
     cultural_api.add_argument('--ccbaCtcd', default="33",  help="")
     cultural_api.add_argument('--ccbaKdcd', default="11",  help="")
     cultural_api.add_argument('--pageUnit', default="300",  help="")
     
-    # 문화재 이미지 정보 파서
+    # 문화재 이미지 정보 파서 (xml 전처리 필요)
     cultural_image_api = subparsers.add_parser('cultural_img', help='cultural_img')
     cultural_image_api.add_argument('--ccbaCtcd', default="33",  help="")
     cultural_image_api.add_argument('--ccbaKdcd', default="11",  help="")
     cultural_image_api.add_argument('--ccbaAsno', default="00640000",  help="")
     
     # 축산시설정보 외 ,,,5개 파서
-    
-    
-    
-    
-    
+    farminfo_api = subparsers.add_parser('farminfo', help='farminfo')
+    farminfo_api.add_argument('--page', default="1",  help="")
+    farminfo_api.add_argument('--perPage', default="2000",  help="") # totalCount
+    farminfo_api.add_argument('--returnType', default="json",  help="") 
+    # farminfo_api.add_argument('--region', default="",  help="지역명 영문으로 작성해주세요. \n ex : (jincheon, jeungpyeong, eumseong, goesan, cheongju)") 
     
     
     
@@ -362,7 +440,7 @@ if __name__ == '__main__':
         water_level_rainfall_sub(args.api, args.apiName)
         
     # 페이지 모듈 별 정보 
-    elif args.api == "weather": # 수위 강수량 관측소 정보  python main.py water_level_rainfall_sub --apiName=waterlevel
+    elif args.api == "weather": # 기상 정보
         weather(args.api, args.pageNo,  args.numOfRows, args.dataType, args.base_date, args.base_time, args.nx, args.ny)
         
     elif args.api == "atmoshpere": # 대기 정보
@@ -379,6 +457,9 @@ if __name__ == '__main__':
         
     elif args.api == "tourism": # 관광지 정보
         tourism(args.api, args.pageUnit, args.searchCnd, args.searchKrwd )
+        
+    elif args.api == "farminfo": # 축산시설 정보
+        farminfo(args.api, args.page, args.perPage, args.returnType )
         
     # if config.has_section(pageName):
         

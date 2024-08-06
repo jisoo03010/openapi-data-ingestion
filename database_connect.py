@@ -30,11 +30,19 @@ def save_to_database(table_name, columns_str, data_frame):
     # v
     try:
         data_frame = data_frame.where(pd.notnull(data_frame), '')
+        
+        # # '사업장 소재지' 컬럼이 존재하는지 확인하고 결합
+        # '사업장 소재지' 컬럼이 존재하는지 확인하고 결합
+            
+        
+        
         columns = data_frame.columns.tolist()
-        if table_name == 'TB_WATER_QUALITY':
+        
+        print("merged_df.columns : \n" ,columns , "\n\n-----------------")
+        if table_name == 'tb_gt_water_quality':
             columns.remove('ROWNO')
-        elif table_name == 'TB_WATER_LEVEL' or table_name == 'TB_WATER_LEVEL_OBSERVATION_POINT' \
-              or table_name == 'TB_RAINFALL' or table_name == 'TB_RAINFALL_OBSERVATION_POINT':
+        elif table_name == 'tb_gt_water_level' or table_name == 'tb_gt_water_level_observation_point' \
+              or table_name == 'tb_gt_rainfall' or table_name == 'tb_gt_rainfall_observation_point':
             columns.remove('links')
             
         for _, row in data_frame.iterrows():
@@ -42,7 +50,7 @@ def save_to_database(table_name, columns_str, data_frame):
             # values += (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES {values}"
             
-            print("\n\n\n\n\nQuery ------------------------------\n", insert_query)
+            # print("\n\n\n\n\nQuery ------------------------------\n", insert_query)
             cursor.execute(insert_query)
         conn.commit()
         print("성공적으로 데이터가 삽입되었습니다!")
