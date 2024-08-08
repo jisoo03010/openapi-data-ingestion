@@ -4,9 +4,13 @@ import configparser
 import datetime
 import pandas as pd
 import math
+
+
+
     
 config = configparser.RawConfigParser()
 config.read("config.ini", encoding="utf-8")
+
 def db_connect():
     db_user = config.get('DATABASE', 'db_user')
     db_password = config.get('DATABASE', 'db_password')
@@ -30,28 +34,31 @@ def save_to_database(table_name, columns_str, data_frame):
     # v
     try:
         data_frame = data_frame.where(pd.notnull(data_frame), '')
-        
-        # # '사업장 소재지' 컬럼이 존재하는지 확인하고 결합
-        # '사업장 소재지' 컬럼이 존재하는지 확인하고 결합
-            
-        
-        
         columns = data_frame.columns.tolist()
         
-        print("merged_df.columns : \n" ,columns , "\n\n-----------------")
         if table_name == 'tb_gt_water_quality':
             columns.remove('ROWNO')
-        elif table_name == 'tb_gt_water_level' or table_name == 'tb_gt_water_level_observation_point' \
-              or table_name == 'tb_gt_rainfall' or table_name == 'tb_gt_rainfall_observation_point':
+        elif table_name == 'tb_gt_water_level' or table_name == 'tb_gt_water_level_observation_point' or table_name == 'tb_gt_rainfall' or table_name == 'tb_gt_rainfall_observation_point':
             columns.remove('links')
+        elif table_name == 'tb_gt_cultural':
+            columns.remove('sn')
+            columns.remove('crltsnoNm')
+        elif table_name == 'tb_gt_cultural_img':
+            columns.remove('sn')
+            
             
         for _, row in data_frame.iterrows():
             values = tuple(None if isinstance(row[col], float) and math.isnan(row[col]) else row[col] for col in columns)
             # values += (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+           
+            
             insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES {values}"
             
             # print("\n\n\n\n\nQuery ------------------------------\n", insert_query)
-            cursor.execute(insert_query)
+            cursor.execute(insert_query) 
+            
+            # if table_name == 'tb_gt_cultural':
+            #     cultural_img(row['ccbaAsno'] , row['ccbaKdcd'] )
         conn.commit()
         print("성공적으로 데이터가 삽입되었습니다!")
         

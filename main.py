@@ -1,13 +1,13 @@
 
 import argparse
-import configparser
 import json
 import requests
 import urllib.parse
 import configparser
+import xml.etree.ElementTree as ET
 import datetime
 import pandas as pd
-from database_connect import save_to_database
+from database_connect import  save_to_database
 from water_quality import response_data
 # 각 페이지에 필요한 파라미터 정보
 
@@ -50,7 +50,6 @@ def merge_data_frames(data_frames):
 
     # data_frame_arr.append(data_frame)
     # merged_df = merge_data_frames(data_frame_arr)
-    print("\n\n===========\nmerged_df : ", merged_df)
 
     return merged_df
 
@@ -58,6 +57,7 @@ def merge_data_frames(data_frames):
 def get_data_load(url):
     response = requests.get(url, verify=False)
     contents = response.text
+    
     json_ob = json.loads(contents)
     return json_ob
     
@@ -87,7 +87,6 @@ def api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, rfo
     api_name = api_name.upper()
     if hydro_type == 'rainfall':
         service_key = config.get(api_name, 'rainfall_service_key')
-        print("service_key L: ", service_key)
         api_url = config.get(api_name, 'api_url')
         base_url = api_url.format(
                                 apiName=hydro_type,
@@ -99,7 +98,6 @@ def api_url_path_params(api_name, hydro_type, data_type, time_type, wlobscd, rfo
                                 )
     else:
         service_key = config.get(api_name, 'service_key')
-        print("service_key L: ", service_key)
         api_url = config.get(api_name, 'api_url')
         base_url = api_url.format(
                                 apiName=hydro_type,
@@ -159,16 +157,15 @@ def rainfall(api_name, hydro_type, data_type, time_type, rfobscd, document_type)
     
 # 수위, 강수량 관측소 정보 조회 
 def water_level_rainfall_sub(api_name, hydro_type):
-    print("api_name ; ", api_name)
     final_url = api_url_path_params(api_name, hydro_type , "", "",  "", "", "")
     json_ob = get_data_load(final_url)
     
-    if hydro_type == 'waterLevel':
+    if hydro_type == 'waterlevel':
         table_name  = 'tb_gt_water_level_observation_point' # 수위 관측소 정보 테이블
         columns_str = '''wlobscd, agcnm, obsnm, addr, etcaddr, lon, lat, gdt, attwl, wrnwl, almwl, srswl, pfh, fstnyn'''
-    else:
+    elif hydro_type == 'rainfall':
         table_name  = 'tb_gt_rainfall_observation_point' # 강수량 관측소 정보 테이블
-        columns_str = '''rfobscd, obsnm, agcnm, addr, etcaddr, lon, lat'''
+        columns_str = '''rfobscd,  agcnm ,obsnm, addr, etcaddr, lon, lat'''
         
     body = json_ob['content']
     response_data(body , table_name, columns_str)
@@ -219,9 +216,7 @@ def atmoshpere(api_name, sido_name, num_of_rows, page_no, ver, return_type):
     final_url = urllib.parse.urlunparse(url_parts)
 
     
-    print("final_url : ", final_url)
     json_ob = get_data_load(final_url)
-    print("json_ob : ", json_ob)
     table_name  = 'tb_gt_atmosphere'
     columns_str = '''so2Grade, coFlag, khaiValue, so2Value, coValue, pm25Flag, pm10Flag, pm10Value, o3Grade, khaiGrade, pm25Value, sidoName, no2Flag, no2Grade, o3Flag, pm25Grade, so2Flag, dataTime, coGrade, no2Value, stationName, pm10Grade, o3Value''' #, createdAt, updatedAt 
     body = json_ob['response']['body']['items']
@@ -250,9 +245,29 @@ def atmoshpere_sub(api_name, num_of_rows, page_no, station_name, addr, return_ty
     columns_str = '''dmX, item,  mangName,  year, addr, stationName, dmY''' #, createdAt, updatedAt 
     body = json_ob['response']['body']['items']
     response_data(body , table_name, columns_str)
-    
-    
+
+
+
+# xml 처리 ------------------------------
+def clean_text(text):
+    if text:
+        return text.replace('<![CDATA[', '').replace(']]>', '').replace('<', '').replace('>', '').replace('!', '').replace('[', '').replace(']', '')
+    return text
+
+def xml_to_dict(element):
+    if len(element) == 0:
+        return clean_text(element.text)
+    result_dict = {}
+    for child in element:
+        if child.tag == "item":
+            if "items" not in result_dict:
+                result_dict["items"] = []
+            result_dict["items"].append(xml_to_dict(child))
+        else:
+            result_dict[child.tag] = xml_to_dict(child)
+    return result_dict
         
+# 문화재 func
 def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit):
     query_params = {
         'api': api_name,
@@ -268,13 +283,60 @@ def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit):
     url_parts[4] = urllib.parse.urlencode(query, doseq=True)
     final_url = urllib.parse.urlunparse(url_parts)
     
-    print("final_url:", final_url)
-    json_ob = get_data_load(final_url)
+    response = requests.get(final_url, verify=False)
+    xml_data = response.text
+    
+    root = ET.fromstring(xml_data)
+    data_dict = {root.tag: xml_to_dict(root)}
+    # Convert dictionary to JSON
+    json_data = json.dumps(data_dict, ensure_ascii=False, indent=4)
+    
+    json_ob = json.loads(json_data)
     table_name  = 'tb_gt_cultural'
     columns_str = ''' no, ccmaName, ccbaMnm1, ccbaMnm2, ccbaCtcdNm, ccsiName, ccbaAdmin, ccbaKdcd, ccbaCtcd, ccbaAsno, ccbaCncl, ccbaCpno, longitude, latitude, regDt''' #, createdAt, updatedAt 
-    body = json_ob['result']
+    body = json_ob['result']['items']
+    for i in range(len(body)):
+        print("ccbaKdcd : ", body[i]['ccbaKdcd'])
+        cultural_img(body[i]['ccbaAsno'],  body[i]['ccbaKdcd'])
+
+    response_data(body , table_name, columns_str)
+            
+    # cultural_img(ccba_kdcd, ccba_asno, ccba_ctcd)
+
+# # 문화재 이미지 func
+def cultural_img(ccba_asno , ccba_kdcd): #종목코드, 관리번호, 시도코드
+    # ccba_kdcd = [11, 12,  13, 14, 15, 16, 17, 18, 21, 22, 23, 24, 25, 31, 79, 80]
+    
+    query_params = {
+        # 'api': 'cultural_img',
+        'ccbaKdcd': ccba_kdcd,
+        'ccbaAsno': ccba_asno,
+        'ccbaCtcd': '33'
+    }
+    print(" \n\n query_params : ",query_params)
+    base_url = api_url_query_params('cultural_image')
+    url_parts = list(urllib.parse.urlparse(base_url))
+    query = urllib.parse.parse_qs(url_parts[4])
+    query.update(query_params)
+    
+    url_parts[4] = urllib.parse.urlencode(query, doseq=True)
+    final_url = urllib.parse.urlunparse(url_parts)
+    print(final_url)
+    response = requests.get(final_url, verify=False)
+    xml_data = response.text
+    root = ET.fromstring(xml_data)
+    data_dict = {root.tag: xml_to_dict(root)}
+    # Convert dictionary to JSON
+    json_data = json.dumps(data_dict, ensure_ascii=False, indent=4)
+    
+    json_ob = json.loads(json_data)
+    table_name  = 'tb_gt_cultural_img'
+    columns_str = '''imageNuri, imageUrl, ccimDesc''' #, createdAt, updatedAt 
+    body = json_ob['result']['items']
     response_data(body , table_name, columns_str)
     
+
+
 def tourism(api_name, page_unit, search_cnd, search_krwd):
     query_params = {
         'api': api_name,
@@ -297,7 +359,6 @@ def tourism(api_name, page_unit, search_cnd, search_krwd):
     response_data(body , table_name, columns_str)
 
 def farminfo(api_name, page, per_page, return_type):
-    print("api_name : ", api_name)
     query_params = {
         'api': api_name,
         'page': page,  
@@ -389,20 +450,20 @@ def get_parser():
     # 문화재 정보 파서 (xml 전처리 필요)
     cultural_api = subparsers.add_parser('cultural', help='cultural')
     cultural_api.add_argument('--ccbaCtcd', default="33",  help="")
-    cultural_api.add_argument('--ccbaKdcd', default="11",  help="")
-    cultural_api.add_argument('--pageUnit', default="300",  help="")
+    cultural_api.add_argument('--ccbaKdcd', default="",  help="")
+    cultural_api.add_argument('--pageUnit', default="1000",  help="")
     
     # 문화재 이미지 정보 파서 (xml 전처리 필요)
-    cultural_image_api = subparsers.add_parser('cultural_img', help='cultural_img')
-    cultural_image_api.add_argument('--ccbaCtcd', default="33",  help="")
-    cultural_image_api.add_argument('--ccbaKdcd', default="11",  help="")
-    cultural_image_api.add_argument('--ccbaAsno', default="00640000",  help="")
+    # cultural_image_api = subparsers.add_parser('cultural_img', help='cultural_img')
+    # cultural_image_api.add_argument('--ccbaCtcd', default="33",  help="")
+    # cultural_image_api.add_argument('--ccbaKdcd', default="",  help="")
+    # cultural_image_api.add_argument('--ccbaAsno', default="",  help="")
     
     # 축산시설정보 외 ,,,5개 파서
     farminfo_api = subparsers.add_parser('farminfo', help='farminfo')
     farminfo_api.add_argument('--page', default="1",  help="")
     farminfo_api.add_argument('--perPage', default="2000",  help="") # totalCount
-    farminfo_api.add_argument('--returnType', default="json",  help="") 
+    farminfo_api.add_argument('--returnType', default="json",  help="")
     # farminfo_api.add_argument('--region', default="",  help="지역명 영문으로 작성해주세요. \n ex : (jincheon, jeungpyeong, eumseong, goesan, cheongju)") 
     
     
@@ -430,7 +491,6 @@ if __name__ == '__main__':
     elif args.api == 'water_level_rainfall': # 수위, 강수량 
         
         if args.apiName == "waterlevel":
-            print("args.api :" , args.api)
             water_level(args.api, args.apiName, args.dataType, args.timeType, args.wlobscd, args.rType)
             
         elif args.apiName == "rainfall":
@@ -453,7 +513,7 @@ if __name__ == '__main__':
         cultural(args.api, args.ccbaCtcd, args.ccbaKdcd, args.pageUnit)
         
     # elif args.api == "cultural_img": # 문화재 이미지 정보  (xml 변환 필요)
-    #     cultural_img(args.api, )
+    #     cultural_img(args.api, args.ccbaCtcd)
         
     elif args.api == "tourism": # 관광지 정보
         tourism(args.api, args.pageUnit, args.searchCnd, args.searchKrwd )
@@ -461,19 +521,3 @@ if __name__ == '__main__':
     elif args.api == "farminfo": # 축산시설 정보
         farminfo(args.api, args.page, args.perPage, args.returnType )
         
-    # if config.has_section(pageName):
-        
-        # 서비스 키, api_url 가져오기
-        # service_key = config.get(pageName, 'service_key')
-        # api_url = config.get(pageName, 'api_url')
-        # url = f"{api_url}?serviceKey={service_key}"
-        
-        # command = ["python", f"{args.pageName}.py", f"--url={url}"]
-        
-    #     command = ["python", f"{args.pageName}.py"]
-    #     # 명령어 실행
-    #     subprocess.run(command, shell=True)
-    # else:
-    #     print(f"Configuration for page {args.pageName} not found.")
-    
-    
