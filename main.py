@@ -14,7 +14,7 @@ from water_quality import response_data
 def merge_data_frames(data_frames):
     # 데이터 프레임들을 수직 결합
     merged_df = pd.concat(data_frames, ignore_index=True, sort=False)
-
+    print("merged_df : ", merged_df)
     if '사업장 소재지' in merged_df.columns.tolist():
         merged_df['사업장소재지'] = merged_df['사업장소재지'].combine_first(merged_df['사업장 소재지'])
         merged_df = merged_df.drop(columns=['사업장 소재지'])
@@ -24,14 +24,10 @@ def merge_data_frames(data_frames):
         merged_df['축종'] = merged_df['축종'].combine_first(merged_df['등록축종'])
         merged_df = merged_df.drop(columns=['등록축종'])
     
-    # '데이터기준일자' 컬럼이 존재하는지 확인하고 결합
-    if '데이터기준일자' in merged_df.columns.tolist():
-        merged_df['데이터 기준일자'] = merged_df['데이터 기준일자'].combine_first(merged_df['데이터기준일자'])
-        merged_df = merged_df.drop(columns=['데이터기준일자'])
     
     # '데이터기준' 컬럼이 존재하는지 확인하고 결합
     if '데이터기준' in merged_df.columns.tolist():
-        merged_df['데이터 기준일자'] = merged_df['데이터 기준일자'].combine_first(merged_df['데이터기준'])
+        merged_df['데이터기준일자'] = merged_df['데이터기준일자'].combine_first(merged_df['데이터기준'])
         merged_df = merged_df.drop(columns=['데이터기준'])
         
     # '데이터기준' 컬럼이 존재하는지 확인하고 결합
