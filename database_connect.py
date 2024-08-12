@@ -4,13 +4,16 @@ import configparser
 import datetime
 import pandas as pd
 import math
-
+import logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='data.log', encoding='utf-8', level=logging.DEBUG)
 
 
     
 config = configparser.RawConfigParser()
 config.read("config.ini", encoding="utf-8")
 
+    
 def db_connect():
     db_user = config.get('DATABASE', 'db_user')
     db_password = config.get('DATABASE', 'db_password')
@@ -31,6 +34,14 @@ def db_connect():
 
 def save_to_database(table_name, columns_str, data_frame):
     cursor, conn = db_connect()
+    
+    insert_query = f"select EXISTS (select * from {table_name} limit 1) as success"
+    cursor.execute(insert_query) 
+    result = cursor.fetchone()
+    if result[0] == 1:
+        delete_query = f"delete from {table_name}"
+        # print("이미 데이터가 존재함으로 데이터를 모두 삭제합니다.")
+        cursor.execute(delete_query) 
     # v
     try:
         data_frame = data_frame.where(pd.notnull(data_frame), '')
@@ -49,7 +60,6 @@ def save_to_database(table_name, columns_str, data_frame):
             
         for _, row in data_frame.iterrows():
             values = tuple(None if isinstance(row[col], float) and math.isnan(row[col]) else row[col] for col in columns)
-            # values += (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
            
             
             insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES {values}"
@@ -57,14 +67,11 @@ def save_to_database(table_name, columns_str, data_frame):
             # print("\n\n\n\n\nQuery ------------------------------\n", insert_query)
             cursor.execute(insert_query) 
             
-            # if table_name == 'tb_gt_cultural':
-            #     cultural_img(row['ccbaAsno'] , row['ccbaKdcd'] )
         conn.commit()
         print("성공적으로 데이터가 삽입되었습니다!")
         
-    except pymysql.Error as e:
+    except pymysql.e as e :
         print(f"Error inserting data: {e}")
         conn.rollback()
-    
     finally:
         conn.close()

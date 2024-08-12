@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 import datetime
 import pandas as pd
 from database_connect import  save_to_database
-from water_quality import response_data
+# from water_quality import response_data
 # 각 페이지에 필요한 파라미터 정보
 
 def merge_data_frames(data_frames):
@@ -51,9 +51,9 @@ def merge_data_frames(data_frames):
 
 # url 통해 데이터 가져옴
 def get_data_load(url):
-    response = requests.get(url, verify=False)
+    response = requests.get(url, verify=True , timeout=30)
     contents = response.text
-    
+    print(contents)
     json_ob = json.loads(contents)
     return json_ob
     
@@ -317,7 +317,6 @@ def cultural_img(ccba_asno , ccba_kdcd): #종목코드, 관리번호, 시도코�
     
     url_parts[4] = urllib.parse.urlencode(query, doseq=True)
     final_url = urllib.parse.urlunparse(url_parts)
-    print(final_url)
     response = requests.get(final_url, verify=False)
     xml_data = response.text
     root = ET.fromstring(xml_data)
@@ -383,7 +382,36 @@ def farminfo(api_name, page, per_page, return_type):
         json_ob = get_data_load(final_url)
         body = json_ob['data']
         response_data(body , table_name, columns_str)
+        
+        
+        
+def biological_species(api_name, page_index):
+    query_params = {
+        'pageIndex': page_index
+    }
+    base_url = api_url_query_params(api_name)
+    url_parts = list(urllib.parse.urlparse(base_url))
+    query = urllib.parse.parse_qs(url_parts[4])
+    query.update(query_params)
     
+    url_parts[4] = urllib.parse.urlencode(query, doseq=True)
+    final_url = urllib.parse.urlunparse(url_parts)
+
+    # json_ob = get_data_load(final_url)
+    response = requests.get(final_url,  timeout=30)
+    contents = response.text
+    print(contents)
+    # table_name  = 'tb_gt_weather'
+    # columns_str = '''baseDate, baseTime, category, fcstDate, fcstTime, fcstValue, nx, ny ''' #, createdAt, updatedAt 
+    # body = json_ob['item']
+    # print("\n\n\nbody ::::::::::::::::::::::::::::::::::::::::::::::", body)
+    # response_data(body , table_name, columns_str)
+    
+def biological_detail(api_name, ktsn):
+    query_params = {
+        'ktsn': ktsn
+    }
+    print("query_params : ", query_params , api_name)
 
 def get_parser():
     parser = argparse.ArgumentParser(description='API별 크롤링 및 파라미터 처리')
@@ -470,6 +498,17 @@ def get_parser():
     tourism_api.add_argument('--searchCnd', default="tourNm",  help="")
     tourism_api.add_argument('--searchKrwd', default="",  help="") # 청주 (필수x)
     
+    
+    # 국가생물종 정보 파서
+    biological = subparsers.add_parser('biological', help='biological')
+    biological.add_argument('--pageIndex', default=1,  help="") # 총 6001페이지
+    biological.add_argument('--userId', default=config.get('BIOLOGICAL', 'user_id'))
+    
+    
+    biological_detail = subparsers.add_parser('biological_detail', help='biological_detail')
+    biological_detail.add_argument('--ktsn') 
+    biological.add_argument('--userId', default=config.get('BIOLOGICAL', 'user_id'))
+    
     return parser
 
 if __name__ == '__main__':
@@ -516,4 +555,11 @@ if __name__ == '__main__':
         
     elif args.api == "farminfo": # 축산시설 정보
         farminfo(args.api, args.page, args.perPage, args.returnType )
+        
+    elif args.api == "biological": # 국가생물종 
+        # biological_species(args.api, args.pageIndex, args.userId)
+        biological_species(args.api, args.pageIndex)
+        
+    elif args.api == "biological_detail": # 국가생물종 상세
+        biological_detail(args.api, args.ktsn)
         
