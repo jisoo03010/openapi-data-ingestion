@@ -18,7 +18,10 @@
 - 국가 생물종 이미지 크롤링
 실행 방법 : python water_quality_code_crawling.py
 
-- 국가 생물종 정보 조회
+- 국가 생물종 정보 조회 (준비중)
+
+- 기상 격자 위경도 정보 크롤링
+실행 방법 : python lon_lat_info_crawling.py
 
 
 
