@@ -25,8 +25,8 @@ print(df.head())  # 변환된 데이터 프레임의 첫 몇 줄을 출력해 �
 print("DataFrame columns:", df.columns)
 
 # MySQL 데이터베이스 연결
-connection = pymysql.connect(**db_config)
-cursor = connection.cursor()
+conn = pymysql.connect(**db_config)
+cursor = conn.cursor()
 
 # 데이터 삽입 SQL
 insert_sql = '''
@@ -46,8 +46,8 @@ for _, row in df.iterrows():
     cursor.execute(insert_sql, data)
 
 # 커밋 및 연결 종료
-connection.commit()
+conn.commit()
 cursor.close()
-connection.close()
+conn.close()
 
 print("Data successfully inserted into the database.")

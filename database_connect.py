@@ -32,16 +32,22 @@ def db_connect():
     cursor = conn.cursor()
     return  cursor, conn
 
-def save_to_database(table_name, columns_str, data_frame):
+def db_pk_delete(table_name):
     cursor, conn = db_connect()
-    
-    insert_query = f"select EXISTS (select * from {table_name} limit 1) as success"
-    cursor.execute(insert_query) 
+    select_query = f"select EXISTS (select * from {table_name} limit 1) as success"
+    cursor.execute(select_query) 
     result = cursor.fetchone()
-    if result[0] == 1:
+    
+    # 만약 실시간으로 가져오는 데이터가 아닌 데이터를 주욱 가져오는 API 는 
+    if result[0] == 1: 
         delete_query = f"delete from {table_name}"
         # print("이미 데이터가 존재함으로 데이터를 모두 삭제합니다.")
         cursor.execute(delete_query) 
+    conn.commit()
+
+def save_to_database(table_name, columns_str, data_frame):
+    cursor, conn = db_connect()
+    db_pk_delete(table_name)
     # v
     try:
         data_frame = data_frame.where(pd.notnull(data_frame), '')
@@ -60,12 +66,12 @@ def save_to_database(table_name, columns_str, data_frame):
             
         for _, row in data_frame.iterrows():
             values = tuple(None if isinstance(row[col], float) and math.isnan(row[col]) else row[col] for col in columns)
-           
+
             
             insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES {values}"
-            
+             # db 저장 메서드
             # print("\n\n\n\n\nQuery ------------------------------\n", insert_query)
-            cursor.execute(insert_query) 
+            cursor.execute(insert_query)
             
         conn.commit()
         print("성공적으로 데이터가 삽입되었습니다!")

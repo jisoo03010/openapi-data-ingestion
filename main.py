@@ -1,13 +1,18 @@
 
 import argparse
 import json
+import pymysql
 import requests
 import urllib.parse
 import configparser
 import xml.etree.ElementTree as ET
 import datetime
 import pandas as pd
-from database_connect import  save_to_database
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import time
+import re
+from database_connect import  db_connect, db_pk_delete, save_to_database
 # from water_quality import response_data
 # 각 페이지에 필요한 파라미터 정보
 
@@ -382,36 +387,73 @@ def farminfo(api_name, page, per_page, return_type):
         json_ob = get_data_load(final_url)
         body = json_ob['data']
         response_data(body , table_name, columns_str)
-        
-        
-        
-def biological_species(api_name, page_index):
-    query_params = {
-        'pageIndex': page_index
-    }
-    base_url = api_url_query_params(api_name)
-    url_parts = list(urllib.parse.urlparse(base_url))
-    query = urllib.parse.parse_qs(url_parts[4])
-    query.update(query_params)
+  
+def biological():
+    driver = webdriver.Chrome()
+    # Navigate to the website
+    driver_url = "https://species.nibr.go.kr/home/mainHome.do?cont_link=002&subMenu=002003&contCd=002003002"
+    driver.get(driver_url)
+    table_name  = 'tb_gt_biological_species'
+    columns_str = '''korNm, enNm, phylumnm, classnm, ordernm, familynm, genusnm, image_url'''
     
-    url_parts[4] = urllib.parse.urlencode(query, doseq=True)
-    final_url = urllib.parse.urlunparse(url_parts)
+    try:
+        cursor, conn = db_connect()  # 데이터베이스 연결 함수
+        db_pk_delete(table_name)
+        ul = driver.find_element(By.CLASS_NAME, "list-box")
+        
+        
+        
+        btn_w = driver.find_element(By.CLASS_NAME, "btn_w")
+        
+        
+        click_btn = btn_w.find_element(By.CLASS_NAME, "txt-center")
+        time.sleep(2)
+        
+        media_count = driver.find_element(By.CLASS_NAME, "media-count").text
+        match = re.search(r'\d{1,3}(,\d{3})*', media_count)
+        if match:
+            number = match.group().replace(',', '')
+            range_count = int(int(number) / 9)
+            
+        items_loaded = 0
+        while items_loaded < range_count:
+            print(f"Clicking {items_loaded + 1}/{range_count}")
+            time.sleep(2) 
+            click_btn.click()
+            items_loaded += 1
 
-    # json_ob = get_data_load(final_url)
-    response = requests.get(final_url,  timeout=30)
-    contents = response.text
-    print(contents)
-    # table_name  = 'tb_gt_weather'
-    # columns_str = '''baseDate, baseTime, category, fcstDate, fcstTime, fcstValue, nx, ny ''' #, createdAt, updatedAt 
-    # body = json_ob['item']
-    # print("\n\n\nbody ::::::::::::::::::::::::::::::::::::::::::::::", body)
-    # response_data(body , table_name, columns_str)
+        lis = ul.find_elements(By.TAG_NAME, "li")
+        
+        for li in lis:
+            a = li.find_element(By.TAG_NAME, "a")
+            list_img = a.find_element(By.CLASS_NAME, "list-img")
+            image_url = list_img.find_element(By.TAG_NAME, "img").get_attribute("src")
+
+            list_txt = a.find_element(By.CLASS_NAME, "list-txt")
+            co_name = list_txt.find_element(By.CLASS_NAME, "tit-infotop").text  # 한문
+            en_name = list_txt.find_element(By.CLASS_NAME, "st-name").text  # 영문
+            step_txt = list_txt.find_element(By.CLASS_NAME, "step-txt").text  # Additional text
+            step_arr = step_txt.split(" > ")
+            
+            insert_query = f"INSERT INTO {table_name} ({columns_str}) VALUES ('{co_name}','{en_name}','{step_arr[0]}','{step_arr[1]}','{step_arr[2]}','{step_arr[3]}','{step_arr[4]}','{image_url}')"
+            cursor.execute(insert_query)
+        
+        conn.commit()
+        print("Data successfully inserted into the database.")
+    except Exception as e:
+        print(f"Error processing: {e}")
     
-def biological_detail(api_name, ktsn):
-    query_params = {
-        'ktsn': ktsn
-    }
-    print("query_params : ", query_params , api_name)
+    finally:
+        # Quit the driver
+        driver.quit()
+        conn.close()
+    
+    
+    
+    
+    
+    
+    
 
 def get_parser():
     parser = argparse.ArgumentParser(description='API별 크롤링 및 파라미터 처리')
@@ -500,19 +542,15 @@ def get_parser():
     
     
     # 국가생물종 정보 파서
-    biological = subparsers.add_parser('biological', help='biological')
-    biological.add_argument('--pageIndex', default=1,  help="") # 총 6001페이지
-    biological.add_argument('--userId', default=config.get('BIOLOGICAL', 'user_id'))
+    subparsers.add_parser('biological', help='biological')
     
     
-    biological_detail = subparsers.add_parser('biological_detail', help='biological_detail')
-    biological_detail.add_argument('--ktsn') 
-    biological.add_argument('--userId', default=config.get('BIOLOGICAL', 'user_id'))
+    # biological_detail = subparsers.add_parser('biological_detail', help='biological_detail')
+    # biological_detail.add_argument('--ktsn') 
+    # biological.add_argument('--userId', default=config.get('BIOLOGICAL', 'user_id'))
     
     return parser
-
 if __name__ == '__main__':
-    
     config = configparser.RawConfigParser(interpolation=None)
     config.read("config.ini", encoding="utf-8")
             
@@ -546,7 +584,6 @@ if __name__ == '__main__':
         
     elif args.api == "cultural": # 문화재 정보 (xml 변환 필요)
         cultural(args.api, args.ccbaCtcd, args.ccbaKdcd, args.pageUnit)
-        
     # elif args.api == "cultural_img": # 문화재 이미지 정보  (xml 변환 필요)
     #     cultural_img(args.api, args.ccbaCtcd)
         
@@ -558,8 +595,4 @@ if __name__ == '__main__':
         
     elif args.api == "biological": # 국가생물종 
         # biological_species(args.api, args.pageIndex, args.userId)
-        biological_species(args.api, args.pageIndex)
-        
-    elif args.api == "biological_detail": # 국가생물종 상세
-        biological_detail(args.api, args.ktsn)
-        
+        biological()
