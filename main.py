@@ -268,7 +268,7 @@ def xml_to_dict(element):
     return result_dict
         
 # 문화재 func
-def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit):
+def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit, img_craw):
     query_params = {
         'api': api_name,
         'ccbaCtcd': ccba_ctcd,  
@@ -295,11 +295,13 @@ def cultural(api_name, ccba_ctcd, ccba_kdcd, page_unit):
     table_name  = 'tb_gt_cultural'
     columns_str = ''' no, ccmaName, ccbaMnm1, ccbaMnm2, ccbaCtcdNm, ccsiName, ccbaAdmin, ccbaKdcd, ccbaCtcd, ccbaAsno, ccbaCncl, ccbaCpno, longitude, latitude, regDt''' #, createdAt, updatedAt 
     body = json_ob['result']['items']
-    for i in range(len(body)):
-        print("ccbaKdcd : ", body[i]['ccbaKdcd'])
-        cultural_img(body[i]['ccbaAsno'],  body[i]['ccbaKdcd'])
-
-    response_data(body , table_name, columns_str)
+    if img_craw == "cultural_img":
+        
+        for i in range(len(body)):
+            print("ccbaKdcd : ", body[i]['ccbaKdcd'])
+            cultural_img(body[i]['ccbaAsno'],  body[i]['ccbaKdcd'])
+    else :
+        response_data(body , table_name, columns_str)
             
     # cultural_img(ccba_kdcd, ccba_asno, ccba_ctcd)
 
@@ -517,6 +519,7 @@ def get_parser():
     cultural_api.add_argument('--ccbaCtcd', default="33",  help="")
     cultural_api.add_argument('--ccbaKdcd', default="",  help="")
     cultural_api.add_argument('--pageUnit', default="1000",  help="")
+    cultural_api.add_argument('--imgCraw', default="",  help="")
     
     # 문화재 이미지 정보 파서 (xml 전처리 필요)
     # cultural_image_api = subparsers.add_parser('cultural_img', help='cultural_img')
@@ -582,7 +585,7 @@ if __name__ == '__main__':
         atmoshpere_sub(args.api, args.numOfRows,  args.pageNo, args.stationName, args.addr, args.returnTypeSub)
         
     elif args.api == "cultural": # 문화재 정보 (xml 변환 필요)
-        cultural(args.api, args.ccbaCtcd, args.ccbaKdcd, args.pageUnit)
+        cultural(args.api, args.ccbaCtcd, args.ccbaKdcd, args.pageUnit, args.imgCraw)
     # elif args.api == "cultural_img": # 문화재 이미지 정보  (xml 변환 필요)
     #     cultural_img(args.api, args.ccbaCtcd)
         
