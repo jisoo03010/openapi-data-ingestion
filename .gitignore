@@ -1,6 +1,3 @@
 # 특정 파일 무시
 config.ini
-water_level.py
-water_quality_rollback_file.py
 __pycache__/
-exel.py

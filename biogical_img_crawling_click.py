@@ -11,20 +11,19 @@ from selenium.common.exceptions import NoAlertPresentException
 import re
 from database_connect import db_connect
 def main():
-    driver = webdriver.Chrome(executable_path='C:\chromedriver.exe')
-
-    driver_url = "https://species.nibr.go.kr/home/mainHome.do?cont_link=002&subMenu=002003&contCd=002003002"
-    driver.get(driver_url)
-    cursor, conn = db_connect()
-    
-    # chrome_driver_path = 'C:\\chromedriver.exe'
-    # # Set Chrome options
-    # options = webdriver.ChromeOptions()
-    # options.add_argument("headless")
-    # service = Service(executable_path=chrome_driver_path)
-    # driver = webdriver.Chrome(service=service, options=options)
+    # driver = webdriver.Chrome(executable_path='C:\\chromedriver.exe')
     # driver_url = "https://species.nibr.go.kr/home/mainHome.do?cont_link=002&subMenu=002003&contCd=002003002"
     # driver.get(driver_url)
+    cursor, conn = db_connect()
+    
+    chrome_driver_path = 'C:\\chromedriver.exe'
+    # Set Chrome options
+    options = webdriver.ChromeOptions()
+    options.add_argument("headless")
+    service = Service(executable_path=chrome_driver_path)
+    driver = webdriver.Chrome(service=service, options=options)
+    driver_url = "https://species.nibr.go.kr/home/mainHome.do?cont_link=002&subMenu=002003&contCd=002003002"
+    driver.get(driver_url)
     try:
         
         wait = WebDriverWait(driver, 10)  # Explicit Wait 설정

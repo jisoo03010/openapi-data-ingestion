@@ -4,9 +4,9 @@ import configparser
 import datetime
 import pandas as pd
 import math
-import logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(filename='data.log', encoding='utf-8', level=logging.DEBUG)
+# import logging
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(filename='data.log', encoding='utf-8', level=logging.DEBUG)
 
 
     
