@@ -12,7 +12,7 @@ import re
 from database_connect import db_connect
 def main():
     driver = webdriver.Chrome(executable_path='C:\chromedriver.exe')
-
+    print("")
     driver_url = "https://species.nibr.go.kr/home/mainHome.do?cont_link=002&subMenu=002003&contCd=002003002"
     driver.get(driver_url)
     cursor, conn = db_connect()
